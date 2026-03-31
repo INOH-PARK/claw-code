@@ -1,12 +1,23 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
 from .models import PortingBacklog, PortingModule
+from .permissions import ToolPermissionContext
 
 SNAPSHOT_PATH = Path(__file__).resolve().parent / 'reference_data' / 'tools_snapshot.json'
+
+
+@dataclass(frozen=True)
+class ToolExecution:
+    name: str
+    source_hint: str
+    payload: str
+    handled: bool
+    message: str
 
 
 @lru_cache(maxsize=1)
@@ -42,10 +53,37 @@ def get_tool(name: str) -> PortingModule | None:
     return None
 
 
+def filter_tools_by_permission_context(tools: tuple[PortingModule, ...], permission_context: ToolPermissionContext | None = None) -> tuple[PortingModule, ...]:
+    if permission_context is None:
+        return tools
+    return tuple(module for module in tools if not permission_context.blocks(module.name))
+
+
+def get_tools(
+    simple_mode: bool = False,
+    include_mcp: bool = True,
+    permission_context: ToolPermissionContext | None = None,
+) -> tuple[PortingModule, ...]:
+    tools = list(PORTED_TOOLS)
+    if simple_mode:
+        tools = [module for module in tools if module.name in {'BashTool', 'FileReadTool', 'FileEditTool'}]
+    if not include_mcp:
+        tools = [module for module in tools if 'mcp' not in module.name.lower() and 'mcp' not in module.source_hint.lower()]
+    return filter_tools_by_permission_context(tuple(tools), permission_context)
+
+
 def find_tools(query: str, limit: int = 20) -> list[PortingModule]:
     needle = query.lower()
     matches = [module for module in PORTED_TOOLS if needle in module.name.lower() or needle in module.source_hint.lower()]
     return matches[:limit]
+
+
+def execute_tool(name: str, payload: str = '') -> ToolExecution:
+    module = get_tool(name)
+    if module is None:
+        return ToolExecution(name=name, source_hint='', payload=payload, handled=False, message=f'Unknown mirrored tool: {name}')
+    action = f"Mirrored tool '{module.name}' from {module.source_hint} would handle payload {payload!r}."
+    return ToolExecution(name=module.name, source_hint=module.source_hint, payload=payload, handled=True, message=action)
 
 
 def render_tool_index(limit: int = 20, query: str | None = None) -> str:

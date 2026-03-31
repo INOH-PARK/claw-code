@@ -19,6 +19,24 @@ class PortingModule:
     status: str = 'planned'
 
 
+@dataclass(frozen=True)
+class PermissionDenial:
+    tool_name: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class UsageSummary:
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+    def add_turn(self, prompt: str, output: str) -> 'UsageSummary':
+        return UsageSummary(
+            input_tokens=self.input_tokens + len(prompt.split()),
+            output_tokens=self.output_tokens + len(output.split()),
+        )
+
+
 @dataclass
 class PortingBacklog:
     title: str

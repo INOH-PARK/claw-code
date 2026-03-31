@@ -15,3 +15,8 @@ class HistoryLog:
 
     def add(self, title: str, detail: str) -> None:
         self.events.append(HistoryEvent(title=title, detail=detail))
+
+    def as_markdown(self) -> str:
+        lines = ['# Session History', '']
+        lines.extend(f'- {event.title}: {event.detail}' for event in self.events)
+        return '\n'.join(lines)
